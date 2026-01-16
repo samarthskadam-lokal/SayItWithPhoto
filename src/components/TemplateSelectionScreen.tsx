@@ -238,8 +238,8 @@ export function TemplateSelectionScreen({
     const fetchData = async () => {
       try {
         const [categoriesResponse, templatesResponse] = await Promise.all([
-          fetch('/api/greetings/tags/active/'),
-          fetch('/api/greetings/templates/')
+          fetch('https://testapi.eazeapp.com/greetings/tags/active/'),
+          fetch('https://testapi.eazeapp.com/greetings/templates/')
         ]);
         
         const apiCategories: Category[] = await categoriesResponse.json();

@@ -14,6 +14,7 @@ const templates = {
   christmas: 'https://images.unsplash.com/photo-1732937135332-19276893ac6b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjaHJpc3RtYXMlMjB0cmVlJTIwbGlnaHRzJTIwZGVjb3JhdGlvbnN8ZW58MXx8fHwxNzY4NDgzNTkwfDA&ixlib=rb-4.1.0&q=80&w=1080',
   birthday: 'https://images.unsplash.com/photo-1598622443054-499119043e82?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxiaXJ0aGRheSUyMGJhbGxvb25zJTIwY2VsZWJyYXRpb258ZW58MXx8fHwxNzY4NDc4OTU5fDA&ixlib=rb-4.1.0&q=80&w=1080'
 };
+import backgroundimage from '../assets/Background.png';
 
 export function PreviewScreen({ croppedImage, userName, template, onEdit, onContinue }: PreviewScreenProps) {
   return (
@@ -28,7 +29,7 @@ export function PreviewScreen({ croppedImage, userName, template, onEdit, onCont
         <div className="relative w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl" style={{ aspectRatio: '3/4' }}>
           {/* Background Template */}
           <img 
-            src={templates[template as keyof typeof templates] || templates.sunrise}
+            src={backgroundimage}
             alt="Template background"
             className="absolute inset-0 w-full h-full object-cover"
           />
