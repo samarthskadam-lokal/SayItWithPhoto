@@ -1,6 +1,7 @@
 import { Edit, Sparkles, Download, Share2 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { toBlob } from 'html-to-image';
 
 interface TemplateSelectionScreenProps {
   croppedImage: string;
@@ -176,7 +177,33 @@ const templates = {
   }
 };
 
-const categories = [
+interface Category {
+  id: number;
+  title: string;
+}
+
+interface TemplateAPI {
+  id: number;
+  title: string | null;
+  background_image_url: string;
+  aspect_ratio: string;
+  image_placeholder: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  name_placeholder: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  languages: string[];
+  tag: number;
+}
+
+const defaultCategories = [
   { id: 'morning', label: 'Good Morning', color: 'from-orange-500 to-yellow-500' },
   { id: 'diwali', label: 'Diwali', color: 'from-purple-500 to-pink-500' },
   { id: 'christmas', label: 'Christmas', color: 'from-red-500 to-green-500' },
@@ -200,6 +227,58 @@ export function TemplateSelectionScreen({
   const [swipeDirection, setSwipeDirection] = useState<'up' | 'down'>('up');
   const [downloading, setDownloading] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [categories, setCategories] = useState(defaultCategories);
+  const [templates, setTemplates] = useState<TemplateAPI[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTagId, setActiveTagId] = useState<number | null>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
+
+  // Fetch categories and templates from API
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [categoriesResponse, templatesResponse] = await Promise.all([
+          fetch('/api/greetings/tags/active/'),
+          fetch('/api/greetings/templates/')
+        ]);
+        
+        const apiCategories: Category[] = await categoriesResponse.json();
+        const apiTemplates: TemplateAPI[] = await templatesResponse.json();
+        
+        const colorMap: { [key: string]: string } = {
+          'Motivational': 'from-purple-500 to-indigo-500',
+          'Anniversary': 'from-purple-500 to-pink-500',
+          'New Year': 'from-yellow-500 to-green-500',
+          'Birthday': 'from-blue-500 to-purple-500',
+          'Quotes': 'from-gray-500 to-slate-500',
+          'Diwali': 'from-purple-500 to-pink-500',
+          'Pongal': 'from-orange-500 to-red-500',
+          'Christmas': 'from-red-500 to-green-500'
+        };
+        
+        const mappedCategories = apiCategories.map(cat => ({
+          id: cat.title.toLowerCase().replace(/\s+/g, ''),
+          label: cat.title,
+          color: colorMap[cat.title] || 'from-gray-500 to-gray-600',
+          tagId: cat.id
+        }));
+        
+        setCategories(mappedCategories);
+        setTemplates(apiTemplates);
+        
+        if (mappedCategories.length > 0) {
+          setActiveCategory(mappedCategories[0].id);
+          setActiveTagId(mappedCategories[0].tagId);
+        }
+      } catch (error) {
+        console.error('Failed to fetch data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, []);
 
   // Hide swipe indicator after 3 seconds
   useEffect(() => {
@@ -209,15 +288,19 @@ export function TemplateSelectionScreen({
     return () => clearTimeout(timer);
   }, [activeCategory]);
 
-  const filteredTemplates = Object.entries(templates).filter(
-    ([_, template]) => template.category === activeCategory
+  const filteredTemplates = templates.filter(
+    (template) => template.tag === activeTagId
   );
 
   // Reset to first template when category changes
   const handleCategoryChange = (categoryId: string) => {
-    setActiveCategory(categoryId);
-    setCurrentTemplateIndex(0);
-    setShowSwipeIndicator(true);
+    const selectedCategory = categories.find(cat => cat.id === categoryId);
+    if (selectedCategory) {
+      setActiveCategory(categoryId);
+      setActiveTagId(selectedCategory.tagId);
+      setCurrentTemplateIndex(0);
+      setShowSwipeIndicator(true);
+    }
   };
 
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -299,23 +382,123 @@ export function TemplateSelectionScreen({
   };
 
   const currentTemplate = filteredTemplates[currentTemplateIndex];
+  const templateData = currentTemplate;
+  const capturePreview = async (): Promise<Blob> => {
+    if (!previewRef.current) {
+      throw new Error('Preview not available');
+    }
 
-  const handleDownload = () => {
+    try {
+      // Try html-to-image first
+      const blob = await toBlob(previewRef.current, {
+        cacheBust: true,
+        pixelRatio: 2,
+        filter: (node) => {
+          if (node instanceof HTMLElement && node.dataset.capture === 'ignore') {
+            return false;
+          }
+          return true;
+        }
+      });
+
+      if (!blob) {
+        throw new Error('Failed to capture image - blob is null');
+      }
+
+      return blob;
+    } catch (error) {
+      console.error('Primary capture method failed, trying fallback:', error);
+      
+      // Fallback method: Try with different options
+      try {
+        const fallbackBlob = await toBlob(previewRef.current, {
+          cacheBust: false,
+          pixelRatio: 1,
+          filter: (node) => {
+            if (node instanceof HTMLElement && node.dataset.capture === 'ignore') {
+              return false;
+            }
+            return true;
+          }
+        });
+
+        if (!fallbackBlob) {
+          throw new Error('Fallback capture also failed - blob is null');
+        }
+
+        return fallbackBlob;
+      } catch (fallbackError) {
+        console.error('Fallback capture also failed:', fallbackError);
+        throw new Error(`Image capture failed: ${error instanceof Error ? error.message : 'Unknown capture error'}. Please ensure all images are loaded and try again.`);
+      }
+    }
+  };
+
+  const handleDownload = async () => {
+    if (!templateData) {
+      alert('No template selected');
+      return;
+    }
+
     setDownloading(true);
-    setTimeout(() => {
+    try {
+      const blob = await capturePreview();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${userName}-template-${templateData.id}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Download error:', error);
+      const message = error instanceof Error ? error.message : 'Unknown download error';
+      alert(`Download failed: ${message}`);
+    } finally {
       setDownloading(false);
-      // In a real app, this would trigger download
-    }, 1500);
+    }
   };
 
-  const handleShare = () => {
+  const handleShare = async () => {
+    if (!templateData) {
+      alert('No template selected');
+      return;
+    }
+
     setSharing(true);
-    setTimeout(() => {
+    try {
+      const blob = await capturePreview();
+      const fileName = `${userName}-template-${templateData.id}.png`;
+      const file = new File([blob], fileName, { type: blob.type || 'image/png' });
+
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: fileName,
+          text: 'Check out this festive greeting!'
+        });
+      } else {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        alert('File downloaded since sharing is not supported on this device');
+      }
+    } catch (error) {
+      console.error('Share error:', error);
+      const message = error instanceof Error ? error.message : 'Unknown share error';
+      alert(`Share failed: ${message}`);
+    } finally {
       setSharing(false);
-      // In a real app, this would open share dialog
-    }, 1000);
+    }
   };
 
+  console.log("xyz",currentTemplate?.background_image_url);
   return (
     <div className="min-h-screen bg-gray-900 flex flex-col py-8 pb-6">
       {/* Header */}
@@ -352,6 +535,7 @@ export function TemplateSelectionScreen({
           <div className="h-full flex flex-col min-h-0">
             {/* Full Template Preview with Swipe */}
             <div 
+              ref={previewRef}
               className="relative w-full rounded-3xl overflow-hidden shadow-2xl bg-black select-none cursor-pointer flex-shrink"
               style={{ aspectRatio: '9/16', maxHeight: '65vh' }}
               onTouchStart={handleTouchStart}
@@ -383,17 +567,22 @@ export function TemplateSelectionScreen({
                 >
                   {/* Background */}
                   <img 
-                    src={currentTemplate[1].bg}
-                    alt={currentTemplate[1].name}
+                    src={currentTemplate.background_image_url.replace('https://cdn-eaze-staging.getlokalapp.com', '/cdn')}
+                    alt={`Template ${currentTemplate.id}`}
                     className="absolute inset-0 w-full h-full object-cover pointer-events-none"
                     draggable={false}
+                    crossOrigin="anonymous"
+                    onError={(e: any) => {
+                      console.warn('Background image failed to load:', currentTemplate.background_image_url);
+                      e.target.style.display = 'none';
+                    }}
                   />
                   
                   {/* Overlay */}
                   <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/40 pointer-events-none" />
 
                   {/* Good Morning Text - Top Center */}
-                  <div className="absolute top-16 left-0 right-0 text-center px-6 pointer-events-none">
+                  {/* <div className="absolute top-16 left-0 right-0 text-center px-6 pointer-events-none">
                     <h2 
                       className="text-3xl font-bold text-white mb-3"
                       style={{
@@ -410,10 +599,18 @@ export function TemplateSelectionScreen({
                     >
                       "Every morning brings new potential, but only if you make the most of it."
                     </p>
-                  </div>
+                  </div> */}
 
-                  {/* User Photo - Bottom */}
-                  <div className="absolute bottom-16 left-1/2 -translate-x-1/2 w-32 h-32 rounded-full overflow-hidden border-2 border-white/60 shadow-2xl pointer-events-none">
+                  {/* User Photo - Positioned based on API data */}
+                  <div 
+                    className="absolute rounded-full overflow-hidden border-2 border-white/60 shadow-2xl pointer-events-none"
+                    style={{
+                      left: `${currentTemplate.image_placeholder.x}%`,
+                      top: `${currentTemplate.image_placeholder.y}%`,
+                      width: `${currentTemplate.image_placeholder.width}%`,
+                      height: `${currentTemplate.image_placeholder.height}%`
+                    }}
+                  >
                     <img 
                       src={croppedImage}
                       alt="User preview"
@@ -422,10 +619,18 @@ export function TemplateSelectionScreen({
                     />
                   </div>
 
-                  {/* Name Preview */}
-                  <div className="absolute bottom-4 left-0 right-0 text-center pointer-events-none">
+                  {/* Name Preview - Positioned based on API data */}
+                  <div 
+                    className="absolute pointer-events-none flex items-center justify-center"
+                    style={{
+                      left: `${currentTemplate.name_placeholder.x}%`,
+                      top: `${currentTemplate.name_placeholder.y}%`,
+                      width: `${currentTemplate.name_placeholder.width}%`,
+                      height: `${currentTemplate.name_placeholder.height}%`
+                    }}
+                  >
                     <p 
-                      className="text-2xl font-bold text-white px-6"
+                      className="text-2xl font-bold text-white text-center"
                       style={{
                         textShadow: '2px 2px 8px rgba(0,0,0,0.5), 0 0 20px rgba(0,0,0,0.3)'
                       }}
@@ -442,6 +647,7 @@ export function TemplateSelectionScreen({
                   e.stopPropagation();
                   onEdit();
                 }}
+                data-capture="ignore"
                 className="absolute bottom-2 right-2 z-10 bg-white/25 backdrop-blur-sm px-4 py-2 rounded-xl text-sm font-medium text-white hover:bg-white/35 transition-all shadow-sm flex items-center gap-1"
                 style={{ textShadow: '1px 1px 3px rgba(0,0,0,0.5)' }}
               >
@@ -451,7 +657,7 @@ export function TemplateSelectionScreen({
 
               {/* Swipe Indicator */}
               {showSwipeIndicator && (
-                <div className="absolute bottom-1/2 left-0 right-0 flex justify-center items-center pointer-events-none z-20">
+                <div data-capture="ignore" className="absolute bottom-1/2 left-0 right-0 flex justify-center items-center pointer-events-none z-20">
                   <div className="bg-black/30 backdrop-blur-sm px-4 py-2 rounded-full">
                     <p className="text-white text-xs">↑ Swipe up/down ↓</p>
                   </div>
@@ -459,7 +665,7 @@ export function TemplateSelectionScreen({
               )}
 
               {/* Debug: Current Index Display */}
-              <div className="absolute top-2 left-2 bg-black/50 backdrop-blur-sm px-3 py-1 rounded-full pointer-events-none z-20">
+              <div data-capture="ignore" className="absolute top-2 left-2 bg-black/50 backdrop-blur-sm px-3 py-1 rounded-full pointer-events-none z-20">
                 <p className="text-white text-xs">
                   {currentTemplateIndex + 1} / {filteredTemplates.length}
                 </p>

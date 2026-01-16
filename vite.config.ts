@@ -56,5 +56,19 @@
     server: {
       port: 3000,
       open: true,
+      proxy: {
+        '/api': {
+          target: 'https://testapi.eazeapp.com',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api/, ''),
+          secure: true
+        },
+        '/cdn': {
+          target: 'https://cdn-eaze-staging.getlokalapp.com',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/cdn/, ''),
+          secure: true
+        }
+      }
     },
   });

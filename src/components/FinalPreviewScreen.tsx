@@ -44,6 +44,24 @@ export function FinalPreviewScreen({ croppedImage, userName, template, onBack, o
 
   const currentTemplate = templates[template as keyof typeof templates] || templates.sunrise;
 
+  const drawRoundedRect = (
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    radius: number
+  ) => {
+    const r = Math.min(radius, width / 2, height / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + width, y, x + width, y + height, r);
+    ctx.arcTo(x + width, y + height, x, y + height, r);
+    ctx.arcTo(x, y + height, x, y, r);
+    ctx.arcTo(x, y, x + width, y, r);
+    ctx.closePath();
+  };
+
   // Function to create composite image
   const createCompositeImage = async (): Promise<Blob> => {
     return new Promise((resolve, reject) => {
@@ -117,8 +135,7 @@ export function FinalPreviewScreen({ croppedImage, userName, template, onBack, o
           const messageWidth = ctx.measureText(currentTemplate.message).width + 120;
           const messageX = (canvas.width - messageWidth) / 2;
           const messageY = 320;
-          ctx.beginPath();
-          ctx.roundRect(messageX, messageY, messageWidth, 80, 40);
+          drawRoundedRect(ctx, messageX, messageY, messageWidth, 80, 40);
           ctx.fill();
           ctx.filter = 'none';
           ctx.restore();

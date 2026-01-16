@@ -37,7 +37,7 @@ export function PreviewScreen({ croppedImage, userName, template, onEdit, onCont
           <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/40"></div>
 
           {/* Good Morning Text - Top Center */}
-          <div className="absolute top-16 left-0 right-0 text-center px-6">
+          {/* <div className="absolute top-16 left-0 right-0 text-center px-6">
             <h2 
               className="text-3xl font-bold text-white mb-3"
               style={{
@@ -54,7 +54,7 @@ export function PreviewScreen({ croppedImage, userName, template, onEdit, onCont
             >
               "Every morning brings new potential, but only if you make the most of it."
             </p>
-          </div>
+          </div> */}
 
           {/* User's Circular Photo - Positioned lower at bottom */}
           <div className="absolute bottom-16 left-1/2 -translate-x-1/2 w-32 h-32 rounded-full overflow-hidden border-2 border-white/60 shadow-2xl">
