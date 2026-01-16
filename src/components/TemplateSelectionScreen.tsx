@@ -567,7 +567,7 @@ export function TemplateSelectionScreen({
                 >
                   {/* Background */}
                   <img 
-                    src={currentTemplate.background_image_url.replace('https://cdn-eaze-staging.getlokalapp.com', '/cdn')}
+                    src={currentTemplate?.background_image_url}
                     alt={`Template ${currentTemplate.id}`}
                     className="absolute inset-0 w-full h-full object-cover pointer-events-none"
                     draggable={false}
