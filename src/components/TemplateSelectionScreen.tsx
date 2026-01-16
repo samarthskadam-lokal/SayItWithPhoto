@@ -571,7 +571,6 @@ export function TemplateSelectionScreen({
                     alt={`Template ${currentTemplate.id}`}
                     className="absolute inset-0 w-full h-full object-cover pointer-events-none"
                     draggable={false}
-                    crossOrigin="anonymous"
                     onError={(e: any) => {
                       console.warn('Background image failed to load:', currentTemplate.background_image_url);
                       e.target.style.display = 'none';
