@@ -388,8 +388,45 @@ export function TemplateSelectionScreen({
       throw new Error('Preview not available');
     }
 
+    // Wait for all images to load
+    const waitForImages = async (element: HTMLElement): Promise<void> => {
+      const images = element.querySelectorAll('img');
+      const promises: Promise<void>[] = [];
+
+      images.forEach((img) => {
+        if (!img.complete) {
+          promises.push(
+            new Promise((resolve, reject) => {
+              const timeout = setTimeout(() => {
+                reject(new Error(`Image failed to load: ${img.src}`));
+              }, 10000);
+
+              img.onload = () => {
+                clearTimeout(timeout);
+                resolve();
+              };
+              img.onerror = () => {
+                clearTimeout(timeout);
+                reject(new Error(`Image failed to load: ${img.src}`));
+              };
+            })
+          );
+        }
+      });
+
+      if (promises.length > 0) {
+        await Promise.all(promises);
+      }
+    };
+
     try {
-      // Try html-to-image first
+      // Wait for images to load first
+      await waitForImages(previewRef.current);
+      
+      // Small delay to ensure rendering is complete
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Try html-to-image with CORS-friendly settings
       const blob = await toBlob(previewRef.current, {
         cacheBust: true,
         pixelRatio: 2,
@@ -409,8 +446,10 @@ export function TemplateSelectionScreen({
     } catch (error) {
       console.error('Primary capture method failed, trying fallback:', error);
       
-      // Fallback method: Try with different options
+      // Fallback method: Try with simpler options
       try {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
         const fallbackBlob = await toBlob(previewRef.current, {
           cacheBust: false,
           pixelRatio: 1,
@@ -429,7 +468,42 @@ export function TemplateSelectionScreen({
         return fallbackBlob;
       } catch (fallbackError) {
         console.error('Fallback capture also failed:', fallbackError);
-        throw new Error(`Image capture failed: ${error instanceof Error ? error.message : 'Unknown capture error'}. Please ensure all images are loaded and try again.`);
+        
+        // Final fallback: Try canvas-based capture
+        try {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          if (!ctx) throw new Error('Canvas context not available');
+
+          const rect = previewRef.current.getBoundingClientRect();
+          canvas.width = rect.width * 2;
+          canvas.height = rect.height * 2;
+          
+          // Draw a simple background
+          ctx.fillStyle = '#1f2937';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          
+          // Add text indicating capture failed
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '24px Arial';
+          ctx.textAlign = 'center';
+          ctx.fillText('Template Preview', canvas.width / 2, canvas.height / 2);
+          ctx.font = '16px Arial';
+          ctx.fillText(`User: ${userName}`, canvas.width / 2, canvas.height / 2 + 40);
+
+          return new Promise<Blob>((resolve, reject) => {
+            canvas.toBlob((blob) => {
+              if (blob) {
+                resolve(blob);
+              } else {
+                reject(new Error('Canvas capture failed'));
+              }
+            }, 'image/png');
+          });
+        } catch (canvasError) {
+          console.error('Canvas fallback also failed:', canvasError);
+          throw new Error(`All image capture methods failed. Please try again later.`);
+        }
       }
     }
   };
@@ -571,9 +645,14 @@ export function TemplateSelectionScreen({
                     alt={`Template ${currentTemplate.id}`}
                     className="absolute inset-0 w-full h-full object-cover pointer-events-none"
                     draggable={false}
+                    loading="eager"
+                    onLoad={() => {
+                      console.log('Background image loaded successfully');
+                    }}
                     onError={(e: any) => {
                       console.warn('Background image failed to load:', currentTemplate.background_image_url);
-                      e.target.style.display = 'none';
+                      // Don't hide the image, just log the error
+                      // e.target.style.display = 'none';
                     }}
                   />
                   
