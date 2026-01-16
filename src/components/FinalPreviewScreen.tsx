@@ -375,7 +375,7 @@ export function FinalPreviewScreen({ croppedImage, userName, template, onBack, o
           <button
             onClick={handleDownload}
             disabled={downloading}
-            className="flex-1 bg-gradient-to-r from-green-500 to-green-600 text-white py-4 rounded-2xl font-semibold text-lg shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 disabled:opacity-70"
+            className="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white py-4 rounded-2xl font-semibold text-lg shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 disabled:opacity-70"
           >
             {downloading ? (
               <>
@@ -392,7 +392,7 @@ export function FinalPreviewScreen({ croppedImage, userName, template, onBack, o
           <button
             onClick={handleShare}
             disabled={sharing}
-            className="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white py-4 rounded-2xl font-semibold text-lg shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 disabled:opacity-70"
+            className="flex-1 bg-gradient-to-r from-green-500 to-green-600 text-white py-4 rounded-2xl font-semibold text-lg shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 disabled:opacity-70"
           >
             {sharing ? (
               <>
